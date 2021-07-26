@@ -57,7 +57,10 @@ func WriteJSON(logger *logrus.Entry, w http.ResponseWriter, status int, value in
 		return
 	}
 
-	w.WriteHeader(status)
+	if status > 299 {
+		w.WriteHeader(status)
+	}
+
 	_, _ = fmt.Fprintf(w, "%s", string(b))
 }
 
