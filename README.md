@@ -7,6 +7,43 @@ A small set of utility functions for writing Go HTTP applications.
 go get github.com/app-nerds/nerdweb
 ```
 
+## Server
+
+**nerdweb** comes with a thin wrapper around the *http.ServeMux* component. It provides the additional ability to attach middlewares easily. Here is an example of setting up a server that adds logging and CORS.
+
+```go
+package main
+
+import (
+  "net/http"
+  "github.com/app-nerds/nerdweb"
+  "github.com/app-nerds/nerdweb/middlewares"
+  "github.com/sirupsen/logrus"
+)
+
+var (
+  logger *logrus.Entry
+)
+
+func main() {
+  logger = logrus.New().WithField("who", "example app")
+
+  mux := nerdweb.NewServeMux()
+  mux.HandleFunc("/endpoint", middlewares.Allow(handleEndpoint, http.MethodGet))
+
+  mux.Use(
+    middlewares.RequestLogger(logger),
+    middlewares.AccessControl(middlewares.AllowAllOrigins, middlewares.AllowAllMethods, middlewares.AllowAllHeaders),
+  )
+
+  _ = http.ListenAndServe(":8080", mux)
+}
+
+func handleEndpoint(w http.ResponseWriter, r *http.Request) {
+  nerdweb.WriteString(logger, w, http.StatusOK, "example")
+}
+```
+
 ## Requests
 
 Methods for working with HTTP requests.
@@ -87,3 +124,133 @@ WriteString writes string content to the caller.
 logger := logrus.New().WithField("who", "example")
 nerdweb.WriteString(logger, w, http.StatusInternalServerError, "Bad!")
 ```
+
+## Middlewares
+
+**nerdweb** comes with a few middlewares. You can easily create your own as well.
+
+### Making Your Own
+
+There are two types of middlewares. The first is one you attach to a single handler. The other you attach to the server mux (affects all handlers).
+
+#### Single Handler Middleware
+
+```go
+func MyMiddleware(next http.HandlerFunc) http.HandlerFunc {
+  return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+    fmt.Printf("In my middleware\n")
+    next.ServeHTTP(w, r)
+  })
+}
+```
+
+#### Server Mux Middleware
+
+```go
+type example struct {
+  handler http.Handler
+}
+
+func (m *example) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+  fmt.Printf("In my middleware")
+  m.handler.ServeHTTP(w, r)
+}
+
+func ExampleMiddleware() middlewares.MiddlewareFunc {
+  return func(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+      handler := &example{
+        handler: next,
+      }
+
+      handler.ServeHTTP(w, r)
+    })
+  }
+}
+```
+
+## Bundled Middlewares
+
+### Access Control
+
+AccessControl wraps an HTTP mux with a middleware that sets headers for access control and allowed headers.
+
+```go
+mux := nerdweb.NewServeMux()
+mux.HandleFunc("/endpoint", handler)
+
+mux.Use(middlewares.AccessControl(middlewares.AllowAllOrigins, middlewares.AllowAllMethods, middlewares.AllowAllHeaders)
+```
+
+### Allow
+
+Allow verifies if the caller method matches the provided method. If the caller's method does not match what is allowed, the string "method not allowed" is written back to the caller.
+
+```go
+mux := nerdweb.NewServeMux()
+mux.HandleFunc("/endpoint", middlewares.Allow(myHandler, http.MethodPost))
+```
+
+### CaptureAuth
+
+CaptureAuth captures an authorization token from an Authorization header and stored it in a context variable named "authtoken". This middleware expect the header to be in the format of:
+
+> Authorization: Bearer <token here>
+
+If the header format is invalid, the provided error method is called. Here is an example:
+
+```go
+onInvalidHeader = func(logger *logrus.Entry, w http.ResponseWriter) {
+  result := map[string]string{
+    "error": "invalid JWT header!",
+  }
+
+  nerdweb.WriteJSON(logger, w, http.StatusBadRequest, result)
+}
+
+// Now, in your handler definition
+http.HandleFunc("/endpoint", middlewares.CaptureAuth(handlerFunc, logger, onInvalidHeader))
+```
+
+Then to get the captured authrozation token:
+
+```go
+func handler(w http.ResponseWriter, r *http.Request) {
+  ctx := r.Context()
+
+  ip := ctx.Value("authtoken").(string)
+}
+```
+
+### CaptureIP
+
+CaptureIP captures the caller's IP address and puts it into the context as "ip". Example:
+
+```go
+mux := nerdweb.NewServeMux()
+mux.HandleFunc("/endpoint", handler)
+
+mux.Use(middlewares.CaptureIP())
+```
+
+Then to get the IP from the context:
+
+```go
+func handler(w http.ResponseWriter, r *http.Request) {
+  ctx := r.Context()
+
+  ip := ctx.Value("ip").(string)
+}
+```
+
+### RequestLogger
+
+RequestLogger returns a middleware for logging all requests. It logs using an Entry struct from Logrus.
+
+```go
+mux := nerdweb.NewServeMux()
+mux.HandleFunc("/endpoint", handler)
+
+mux.Use(middlewares.RequestLogger(logger))
+```
+
