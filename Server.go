@@ -18,6 +18,10 @@ func NewServeMux() *ServeMux {
 	}
 }
 
+func (sm *ServeMux) Handle(pattern string, handler http.Handler) {
+	sm.mux.Handle(pattern, handler)
+}
+
 func (sm *ServeMux) HandleFunc(pattern string, handler http.HandlerFunc) {
 	sm.mux.HandleFunc(pattern, handler)
 }
