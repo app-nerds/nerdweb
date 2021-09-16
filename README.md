@@ -1,47 +1,10 @@
 # nerdweb
-A small set of utility functions for writing Go HTTP applications.
+A small set of utility functions for writing Go HTTP applications. Most of these utilities are designed for working with [Gorilla Mux](https://github.com/gorilla/mux). This library has minimal dependencies, and only really requires [logrus](https://github.com/sirupsen/logrus).
 
 ## Usage
 
 ```
-go get github.com/app-nerds/nerdweb
-```
-
-## Server
-
-**nerdweb** comes with a thin wrapper around the *http.ServeMux* component. It provides the additional ability to attach middlewares easily. Here is an example of setting up a server that adds logging and CORS.
-
-```go
-package main
-
-import (
-  "net/http"
-  "github.com/app-nerds/nerdweb"
-  "github.com/app-nerds/nerdweb/middlewares"
-  "github.com/sirupsen/logrus"
-)
-
-var (
-  logger *logrus.Entry
-)
-
-func main() {
-  logger = logrus.New().WithField("who", "example app")
-
-  mux := nerdweb.NewServeMux()
-  mux.HandleFunc("/endpoint", middlewares.Allow(handleEndpoint, http.MethodGet))
-
-  mux.Use(
-    middlewares.RequestLogger(logger),
-    middlewares.AccessControl(middlewares.AllowAllOrigins, middlewares.AllowAllMethods, middlewares.AllowAllHeaders),
-  )
-
-  _ = http.ListenAndServe(":8080", mux)
-}
-
-func handleEndpoint(w http.ResponseWriter, r *http.Request) {
-  nerdweb.WriteString(logger, w, http.StatusOK, "example")
-}
+go get github.com/app-nerds/nerdweb/v2
 ```
 
 ## Requests
@@ -75,10 +38,6 @@ if err := nerdweb.ValidateHTTPMethod(r, w, http.MethodPost, logger); err != nil 
 }
 ```
 
-## Responses
-
-Methods for working with HTTP responses.
-
 ### ReadJSONBody
 
 ReadJSONBody reads the body from an HTTP reponse as JSON data into a provided destinationn variable. In this example the body is read into SampleStruct.
@@ -95,6 +54,10 @@ if err := nerdweb.ReadJSONBody(r, &result); err != nil {
   // Do something with the error
 }
 ```
+
+## Responses
+
+Methods for working with HTTP responses.
 
 ### WriteJSON
 
@@ -156,7 +119,7 @@ func (m *example) ServeHTTP(w http.ResponseWriter, r *http.Request) {
   m.handler.ServeHTTP(w, r)
 }
 
-func ExampleMiddleware() middlewares.MiddlewareFunc {
+func ExampleMiddleware() mux.MiddlewareFunc {
   return func(next http.Handler) http.Handler {
     return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
       handler := &example{

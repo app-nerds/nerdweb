@@ -3,6 +3,8 @@ package middlewares
 import (
 	"context"
 	"net/http"
+
+	"github.com/gorilla/mux"
 )
 
 type captureIP struct {
@@ -24,7 +26,7 @@ context as "ip". Example:
 
   mux.Use(middlewares.CaptureIP())
 */
-func CaptureIP() MiddlewareFunc {
+func CaptureIP() mux.MiddlewareFunc {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			handler := &captureIP{handler: next}

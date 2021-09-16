@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 )
 
@@ -43,7 +44,7 @@ Example:
 
   mux.Use(middlewares.RequestLogger(logger))
 */
-func RequestLogger(logger *logrus.Entry) MiddlewareFunc {
+func RequestLogger(logger *logrus.Entry) mux.MiddlewareFunc {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			handler := &requestLogger{

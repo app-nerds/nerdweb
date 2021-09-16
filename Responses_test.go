@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/app-nerds/nerdweb"
+	"github.com/app-nerds/nerdweb/v2"
 	"github.com/sirupsen/logrus"
 )
 

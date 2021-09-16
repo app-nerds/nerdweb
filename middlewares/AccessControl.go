@@ -1,6 +1,10 @@
 package middlewares
 
-import "net/http"
+import (
+	"net/http"
+
+	"github.com/gorilla/mux"
+)
 
 const (
 	AllowAllOrigins           string = "*"
@@ -40,7 +44,7 @@ Example:
 
   mux.Use(middlewares.AccessControl(middlewares.AllowAllOrigins, middlewares.AllowAllMethods, middlewares.AllowAllHeaders)
 */
-func AccessControl(allowOrigin, allowMethods, allowHeaders string) MiddlewareFunc {
+func AccessControl(allowOrigin, allowMethods, allowHeaders string) mux.MiddlewareFunc {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			handler := &accessControl{
