@@ -7,6 +7,158 @@ A small set of utility functions for writing Go HTTP applications. Most of these
 go get github.com/app-nerds/nerdweb/v2
 ```
 
+## HTTP Servers
+
+**nerdweb** has a few options for creating HTTP servers. These options are mostly to reduce boilerplate. They make use of Gorilla Mux and the standard HTTP library under the hood. **nerdweb** has methods for creating basic REST servers and Single Page Application servers (web apps).
+
+### Endpoints
+
+Regardless of which server option you choose both accept a configuration, and these configurations needs a slice of endpoints. An endpoint has three requirements: a path, a slice of accepted methods, and either a handler function or handler interface.
+
+```go
+type Endpoint struct {
+  Path        string
+  Methods     []string
+  HandlerFunc http.HandlerFunc
+  Handler     http.Handler
+}
+```
+
+See the examples below on how one can configure endpoints.
+
+### REST Server
+
+Here is an example of creating a basic REST server.
+
+```go
+package main
+
+import (
+  "context"
+  "net/http"
+  "time"
+
+  "github.com/app-nerds/nerdweb/v2"
+  "github.com/sirupsen/logrus"
+)
+
+var (
+  logger *logrus.Entry
+)
+
+func main() {
+  logger := logrus.New().WithField("who", "example")
+  restConfig := nerdweb.DefaultRESTConfig("localhost:8080")
+
+  restConfig.Endpoints = nerdweb.Endpoints{
+    {Path: "/version", Methods: []string{http.MethodGet}, HandlerFunc: versionHandler},
+  }
+
+  router, server := nerdweb.NewRESTRouterAndServer(restConfig)
+
+  /*
+   * Start the server in a goroutine
+   */
+  go func() {
+    err := server.ListenAndServe()
+
+    if err != nil && err != http.ErrServerClosed {
+      logger.WithError(err).Fatal("error starting server")
+    }
+  }()
+
+  <-nerdweb.WaitForKill()
+
+  ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+  defer cancel()
+
+  if err = server.Shutdown(ctx); err != nil {
+    logger.WithError(err).Fatal("error shutting down server")
+  }
+
+  logger.Info("server stopped")
+}
+
+func versionHandler(w http.ResponseWriter, r *http.Request) {
+  nerdweb.WriteString(logger, w, http.StatusOK, "version 1")
+}
+```
+
+### SPA Server
+
+Here is an example of creating a basic server with a single page application built-in.
+
+```go
+package main
+
+import (
+  "context"
+  "embed"
+  "net/http"
+  "time"
+
+  "github.com/app-nerds/nerdweb/v2"
+  "github.com/sirupsen/logrus"
+)
+
+var (
+  // Version should be set during build using build flags
+  Version string = "development"
+
+  logger *logrus.Entry
+
+  //go:embed app
+  appFs embed.FS
+
+  //go:embed app/index.html
+  indexHTML []byte
+
+  //go:embed app/main.js
+  mainJS []byte
+
+  //go:embed app/manifest.json
+  manifestJSON []byte
+)
+
+func main() {
+  logger := logrus.New().WithField("who", "example")
+  spaConfig := nerdweb.DefaultSPAConfig("localhost:8080", Version, appFs, indexHTML, mainJS, manifestJSON)
+
+  spaConfig.Endpoints = nerdweb.Endpoints{
+    {Path: "/version", Methods: []string{http.MethodGet}, HandlerFunc: versionHandler},
+  }
+
+  router, server := nerdweb.NewSPARouterAndServer(restConfig)
+
+  /*
+   * Start the server in a goroutine
+   */
+  go func() {
+    err := server.ListenAndServe()
+
+    if err != nil && err != http.ErrServerClosed {
+      logger.WithError(err).Fatal("error starting server")
+    }
+  }()
+
+  <-nerdweb.WaitForKill()
+
+  ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+  defer cancel()
+
+  if err = server.Shutdown(ctx); err != nil {
+    logger.WithError(err).Fatal("error shutting down server")
+  }
+
+  logger.Info("server stopped")
+}
+
+func versionHandler(w http.ResponseWriter, r *http.Request) {
+  nerdweb.WriteString(logger, w, http.StatusOK, "version 1")
+}
+```
+
+
 ## Requests
 
 Methods for working with HTTP requests.
