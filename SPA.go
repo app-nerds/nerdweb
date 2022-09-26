@@ -87,6 +87,39 @@ func NewSPARouterAndServer(config SPAConfig) (*mux.Router, *http.Server) {
 	return router, server
 }
 
+/*
+NewSPAServer accepts an existing Gorilla router and returns an HTTP server
+with some preconfigured defaults for a single page application. The HTTP
+server is setup to use the resulting router.
+*/
+func NewSPAServer(router *mux.Router, config SPAConfig) *http.Server {
+	server := &http.Server{
+		Addr:         config.Host,
+		WriteTimeout: time.Second * time.Duration(config.WriteTimeout),
+		ReadTimeout:  time.Second * time.Duration(config.ReadTimeout),
+		IdleTimeout:  time.Second * time.Duration(config.IdleTimeout),
+		Handler:      router,
+	}
+
+	fs := http.FileServer(getClientAppFileSystem(config))
+	router.Use(middlewares.AccessControl(middlewares.AllowAllOrigins, middlewares.AllowAllMethods, middlewares.AllowAllHeaders))
+
+	sort.Sort(config.Endpoints)
+
+	for _, e := range config.Endpoints {
+		if e.HandlerFunc != nil {
+			router.HandleFunc(e.Path, e.HandlerFunc).Methods(e.Methods...)
+		} else {
+			router.Handle(e.Path, e.Handler).Methods(e.Methods...)
+		}
+	}
+
+	router.PathPrefix("/static/").Handler(fs).Methods(http.MethodGet)
+	router.HandleFunc(`/{path:[a-zA-Z0-9\-_\/\.]*}`, getRootHandler(config))
+
+	return server
+}
+
 func getClientAppFileSystem(spaConfig SPAConfig) http.FileSystem {
 	if spaConfig.Version == "development" {
 		return http.FS(os.DirFS(spaConfig.AppDirectory))
